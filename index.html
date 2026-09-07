@@ -6,6 +6,34 @@
 </head>
 <body>
   <h1>Agenda dos Líderes</h1>
-  <p>Se você está vendo esta página, o site está funcionando!</p>
+  <p>Testando conexão com o banco de dados...</p>
+  <ul id="lista-lideres"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://rcliveeoksfafxytckii.supabase.co/rest/v1/";
+    const SUPABASE_KEY = "sb_publishable_LjQkaNYOQE2kxBxaTs88dg_rZpOdEI_";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function carregarLideres() {
+      const { data, error } = await supabase.from('lideres').select('*');
+
+      const lista = document.getElementById('lista-lideres');
+
+      if (error) {
+        lista.innerHTML = '<li>Erro ao carregar: ' + error.message + '</li>';
+        return;
+      }
+
+      data.forEach(lider => {
+        const item = document.createElement('li');
+        item.textContent = lider.nome;
+        lista.appendChild(item);
+      });
+    }
+
+    carregarLideres();
+  </script>
 </body>
 </html>
