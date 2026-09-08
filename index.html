@@ -142,11 +142,18 @@
       document.getElementById('tela-selecao').style.display = 'block';
     }
 
-    async function carregarChecklist() {
+       async function carregarChecklist() {
       const container = document.getElementById('lista-itens');
       container.innerHTML = 'Carregando checklist...';
 
-     
+      const diaHoje = diaSemanaAtual();
+
+      const { data: itens, error: erroItens } = await supabaseClient
+        .from('itens_agenda')
+        .select('*')
+        .eq('lider_id', liderAtual.id)
+        .or('dia_semana.eq.todos,dia_semana.eq.' + diaHoje);
+
       if (erroItens) {
         container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
         return;
@@ -192,7 +199,6 @@
         container.appendChild(div);
       });
     }
-
     async function marcarItem(item, execExistente, concluido, divElemento) {
       const agora = new Date().toISOString();
 
