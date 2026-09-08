@@ -146,11 +146,7 @@
       const container = document.getElementById('lista-itens');
       container.innerHTML = 'Carregando checklist...';
 
-      const { data: itens, error: erroItens } = await supabaseClient
-        .from('itens_agenda')
-        .select('*')
-        .eq('lider_id', liderAtual.id);
-
+     
       if (erroItens) {
         container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
         return;
