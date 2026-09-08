@@ -2,12 +2,49 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agenda dos Líderes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    #lista-lideres {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .botao-lider {
+      padding: 18px;
+      font-size: 18px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .botao-lider:active {
+      background-color: #1d4ed8;
+    }
+    #mensagem {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+  </style>
 </head>
 <body>
-  <h1>Agenda dos Líderes</h1>
-  <p>Testando conexão com o banco de dados...</p>
-  <ul id="lista-lideres"></ul>
+  <h1>Quem é você?</h1>
+  <div id="lista-lideres">Carregando líderes...</div>
+  <p id="mensagem"></p>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -17,20 +54,27 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function carregarLideres() {
-      const { data, error } = await supabaseClient.from('lideres').select('*');
+      const { data, error } = await supabaseClient.from('lideres').select('*').order('nome');
 
       const lista = document.getElementById('lista-lideres');
+      lista.innerHTML = '';
 
       if (error) {
-        lista.innerHTML = '<li>Erro ao carregar: ' + error.message + '</li>';
+        lista.innerHTML = 'Erro ao carregar: ' + error.message;
         return;
       }
 
       data.forEach(lider => {
-        const item = document.createElement('li');
-        item.textContent = lider.nome;
-        lista.appendChild(item);
+        const botao = document.createElement('button');
+        botao.className = 'botao-lider';
+        botao.textContent = lider.nome;
+        botao.onclick = () => selecionarLider(lider);
+        lista.appendChild(botao);
       });
+    }
+
+    function selecionarLider(lider) {
+      document.getElementById('mensagem').textContent = 'Você selecionou: ' + lider.nome;
     }
 
     carregarLideres();
