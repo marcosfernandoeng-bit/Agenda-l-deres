@@ -148,12 +148,14 @@
 
       const diaHoje = diaSemanaAtual();
 
-      const { data: itens, error: erroItens } = await supabaseClient
+      const { data: todosOsItens, error: erroItens } = await supabaseClient
         .from('itens_agenda')
         .select('*')
-        .eq('lider_id', liderAtual.id)
-        .or('dia_semana.eq.todos,dia_semana.eq.' + diaHoje);
+        .or('lider_id.eq.' + liderAtual.id + ',lider_id.is.null');
 
+      const itens = (todosOsItens || []).filter(item =>
+        item.dia_semana === 'todos' || item.dia_semana === diaHoje
+      );
       if (erroItens) {
         container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
         return;
