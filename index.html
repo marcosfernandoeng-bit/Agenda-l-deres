@@ -33,18 +33,62 @@
     .botao-lider:active {
       background-color: #1d4ed8;
     }
-    #mensagem {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 18px;
-      color: #333;
+    #tela-checklist {
+      display: none;
+    }
+    .botao-voltar {
+      background: none;
+      border: none;
+      color: #2563eb;
+      font-size: 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .item-checklist {
+      display: flex;
+      align-items: center;
+      background: white;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .item-checklist input {
+      width: 24px;
+      height: 24px;
+      margin-right: 14px;
+    }
+    .item-checklist .textos {
+      display: flex;
+      flex-direction: column;
+    }
+    .item-checklist .titulo {
+      font-size: 17px;
+      font-weight: bold;
+    }
+    .item-checklist .descricao {
+      font-size: 14px;
+      color: #666;
+    }
+    .item-checklist.concluido .titulo {
+      text-decoration: line-through;
+      color: #999;
     }
   </style>
 </head>
 <body>
-  <h1>Quem é você?</h1>
-  <div id="lista-lideres">Carregando líderes...</div>
-  <p id="mensagem"></p>
+
+  <!-- TELA 1: SELECIONAR LÍDER -->
+  <div id="tela-selecao">
+    <h1>Quem é você?</h1>
+    <div id="lista-lideres">Carregando líderes...</div>
+  </div>
+
+  <!-- TELA 2: CHECKLIST -->
+  <div id="tela-checklist">
+    <button class="botao-voltar" onclick="voltarParaSelecao()">&larr; Trocar líder</button>
+    <h1 id="nome-lider-checklist"></h1>
+    <div id="lista-itens">Carregando checklist...</div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -52,6 +96,13 @@
     const SUPABASE_KEY = "sb_publishable_LjQkaNYOQE2kxBxaTs88dg_rZpOdEI_";
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let liderAtual = null;
+
+    function hojeISO() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
 
     async function carregarLideres() {
       const { data, error } = await supabaseClient.from('lideres').select('*').order('nome');
@@ -74,7 +125,107 @@
     }
 
     function selecionarLider(lider) {
-      document.getElementById('mensagem').textContent = 'Você selecionou: ' + lider.nome;
+      liderAtual = lider;
+      document.getElementById('tela-selecao').style.display = 'none';
+      document.getElementById('tela-checklist').style.display = 'block';
+      document.getElementById('nome-lider-checklist').textContent = 'Checklist de ' + lider.nome;
+      carregarChecklist();
+    }
+
+    function voltarParaSelecao() {
+      liderAtual = null;
+      document.getElementById('tela-checklist').style.display = 'none';
+      document.getElementById('tela-selecao').style.display = 'block';
+    }
+
+    async function carregarChecklist() {
+      const container = document.getElementById('lista-itens');
+      container.innerHTML = 'Carregando checklist...';
+
+      const { data: itens, error: erroItens } = await supabaseClient
+        .from('itens_agenda')
+        .select('*')
+        .eq('lider_id', liderAtual.id);
+
+      if (erroItens) {
+        container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
+        return;
+      }
+
+      const { data: execucoesHoje, error: erroExec } = await supabaseClient
+        .from('execucoes')
+        .select('*')
+        .eq('lider_id', liderAtual.id)
+        .eq('data', hojeISO());
+
+      if (erroExec) {
+        container.innerHTML = 'Erro ao carregar execuções: ' + erroExec.message;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      if (itens.length === 0) {
+        container.innerHTML = 'Nenhum item de agenda cadastrado para este líder ainda.';
+        return;
+      }
+
+      itens.forEach(item => {
+        const execExistente = execucoesHoje.find(e => e.item_id === item.id);
+        const jaConcluido = execExistente ? execExistente.concluido : false;
+
+        const div = document.createElement('div');
+        div.className = 'item-checklist' + (jaConcluido ? ' concluido' : '');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = jaConcluido;
+        checkbox.onchange = () => marcarItem(item, execExistente, checkbox.checked, div);
+
+        const textos = document.createElement('div');
+        textos.className = 'textos';
+        textos.innerHTML = '<span class="titulo">' + item.titulo + '</span>' +
+          (item.descricao ? '<span class="descricao">' + item.descricao + '</span>' : '');
+
+        div.appendChild(checkbox);
+        div.appendChild(textos);
+        container.appendChild(div);
+      });
+    }
+
+    async function marcarItem(item, execExistente, concluido, divElemento) {
+      const agora = new Date().toISOString();
+
+      if (execExistente) {
+        const { error } = await supabaseClient
+          .from('execucoes')
+          .update({ concluido: concluido, hora_conclusao: concluido ? agora : null })
+          .eq('id', execExistente.id);
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      } else {
+        const { data, error } = await supabaseClient
+          .from('execucoes')
+          .insert({
+            item_id: item.id,
+            lider_id: liderAtual.id,
+            data: hojeISO(),
+            concluido: concluido,
+            hora_conclusao: concluido ? agora : null
+          })
+          .select();
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      }
+
+      divElemento.classList.toggle('concluido', concluido);
+      carregarChecklist();
     }
 
     carregarLideres();
