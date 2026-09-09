@@ -7,10 +7,14 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 500px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 20px;
       background-color: #f4f4f4;
+    }
+    .conteudo-estreito {
+      max-width: 500px;
+      margin: 0 auto;
     }
     h1 {
       text-align: center;
@@ -52,11 +56,17 @@
       cursor: pointer;
       padding: 0;
     }
+    #lista-semana {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+    }
     .card-dia {
       background: white;
       border-radius: 10px;
       padding: 16px;
-      margin-bottom: 14px;
+      flex: 0 0 220px;
     }
     .card-dia h3 {
       margin: 0 0 10px 0;
@@ -64,6 +74,14 @@
     }
     .card-dia.dia-hoje {
       border: 2px solid #2563eb;
+    }
+    .card-dia.dia-bloqueado {
+      opacity: 0.6;
+    }
+    .nota-bloqueado {
+      font-size: 12px;
+      color: #999;
+      margin-top: 4px;
     }
     .lista-rotina {
       margin: 0 0 10px 0;
@@ -95,14 +113,19 @@
       padding: 12px;
       margin-top: 10px;
       width: 100%;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: bold;
       color: #92400e;
       cursor: pointer;
       text-align: left;
     }
+    .linha-foco:disabled {
+      background-color: #eee;
+      color: #999;
+      cursor: not-allowed;
+    }
     .status-foco {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: normal;
     }
     .item-checklist {
@@ -139,7 +162,7 @@
 <body>
 
   <!-- TELA 1: SELECIONAR LÍDER -->
-  <div id="tela-selecao">
+  <div id="tela-selecao" class="conteudo-estreito">
     <h1>Quem é você?</h1>
     <div id="lista-lideres">Carregando líderes...</div>
   </div>
@@ -153,7 +176,7 @@
   </div>
 
   <!-- TELA 3: CHECKLIST DE FOCO (5S / Qualidade / Segurança) -->
-  <div id="tela-foco">
+  <div id="tela-foco" class="conteudo-estreito">
     <button class="botao-voltar" onclick="voltarParaSemana()">&larr; Voltar para a semana</button>
     <h1 id="titulo-foco"></h1>
     <div id="lista-foco">Carregando checklist...</div>
@@ -286,6 +309,7 @@
 
       ORDEM_DIAS.forEach(dia => {
         const dataDoDia = datas[dia];
+        const estaDisponivel = (dia === diaHoje);
 
         const itensNormais = todosOsItens.filter(item =>
           (item.dia_semana === 'todos' || item.dia_semana === dia) &&
@@ -293,7 +317,7 @@
         );
 
         const card = document.createElement('div');
-        card.className = 'card-dia' + (dia === diaHoje ? ' dia-hoje' : '');
+        card.className = 'card-dia' + (estaDisponivel ? ' dia-hoje' : ' dia-bloqueado');
 
         const titulo = document.createElement('h3');
         titulo.textContent = NOMES_DIAS[dia];
@@ -318,6 +342,7 @@
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = rotinaConcluida;
+          checkbox.disabled = !estaDisponivel;
           checkbox.onchange = () => marcarRotinaDia(dataDoDia, execRotina, checkbox.checked);
 
           const label = document.createElement('span');
@@ -326,6 +351,13 @@
           linhaCheck.appendChild(checkbox);
           linhaCheck.appendChild(label);
           card.appendChild(linhaCheck);
+
+          if (!estaDisponivel) {
+            const nota = document.createElement('p');
+            nota.className = 'nota-bloqueado';
+            nota.textContent = 'Disponível somente no dia correspondente.';
+            card.appendChild(nota);
+          }
         } else {
           const p = document.createElement('p');
           p.className = 'lista-rotina';
@@ -339,14 +371,17 @@
           const execucoesFoco = execucoesSemana.filter(e =>
             e.data === dataDoDia && itensFoco.some(i => i.id === e.item_id)
           );
-          const fociConcluido = itensFoco.length > 0 &&
+          const focoConcluido = itensFoco.length > 0 &&
             itensFoco.every(item => execucoesFoco.some(e => e.item_id === item.id && e.concluido));
 
           const botaoFoco = document.createElement('button');
           botaoFoco.className = 'linha-foco';
+          botaoFoco.disabled = !estaDisponivel;
           botaoFoco.innerHTML = '<span>' + foco.label + '</span>' +
-            '<span class="status-foco">' + (fociConcluido ? '✔️ Concluído' : 'Pendente') + '</span>';
-          botaoFoco.onclick = () => abrirFoco(foco.tipo, foco.label, dataDoDia);
+            '<span class="status-foco">' + (focoConcluido ? '✔️ Concluído' : 'Pendente') + '</span>';
+          if (estaDisponivel) {
+            botaoFoco.onclick = () => abrirFoco(foco.tipo, foco.label, dataDoDia);
+          }
           card.appendChild(botaoFoco);
         }
 
