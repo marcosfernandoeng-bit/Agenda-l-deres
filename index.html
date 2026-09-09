@@ -56,17 +56,30 @@
       cursor: pointer;
       padding: 0;
     }
-    #lista-semana {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      padding-bottom: 12px;
+       #lista-semana {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
     }
     .card-dia {
       background: white;
       border-radius: 10px;
-      padding: 16px;
-      flex: 0 0 220px;
+      padding: 10px;
+      min-width: 0;
+    }
+    .card-dia h3 {
+      font-size: 14px;
+    }
+    .lista-rotina {
+      font-size: 12px;
+      padding-left: 16px;
+    }
+    .linha-rotina-check span {
+      font-size: 12px;
+    }
+    .linha-foco {
+      font-size: 11px;
+      padding: 8px;
     }
     .card-dia h3 {
       margin: 0 0 10px 0;
