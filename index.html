@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agenda dos Líderes</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: Arial, sans-serif;
       max-width: 1300px;
@@ -13,7 +16,7 @@
       background-color: #f4f4f4;
     }
     .conteudo-estreito {
-      max-width: 500px;
+      max-width: 600px;
       margin: 0 auto;
     }
     h1 {
@@ -56,34 +59,21 @@
       cursor: pointer;
       padding: 0;
     }
-       #lista-semana {
+    #lista-semana {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 8px;
+      gap: 12px;
     }
     .card-dia {
       background: white;
       border-radius: 10px;
-      padding: 10px;
+      padding: 14px;
       min-width: 0;
-    }
-    .card-dia h3 {
-      font-size: 14px;
-    }
-    .lista-rotina {
-      font-size: 12px;
-      padding-left: 16px;
-    }
-    .linha-rotina-check span {
-      font-size: 12px;
-    }
-    .linha-foco {
-      font-size: 11px;
-      padding: 8px;
     }
     .card-dia h3 {
       margin: 0 0 10px 0;
       color: #333;
+      font-size: 15px;
     }
     .card-dia.dia-hoje {
       border: 2px solid #2563eb;
@@ -98,9 +88,9 @@
     }
     .lista-rotina {
       margin: 0 0 10px 0;
-      padding-left: 20px;
+      padding-left: 18px;
       color: #555;
-      font-size: 14px;
+      font-size: 13px;
     }
     .linha-rotina-check {
       display: flex;
@@ -112,9 +102,11 @@
       width: 22px;
       height: 22px;
       margin-right: 10px;
+      accent-color: #2563eb;
     }
     .linha-rotina-check span {
       font-weight: bold;
+      font-size: 13px;
     }
     .linha-foco {
       display: flex;
@@ -123,10 +115,11 @@
       background-color: #fef3c7;
       border: none;
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
       margin-top: 10px;
       width: 100%;
-      font-size: 14px;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
       font-weight: bold;
       color: #92400e;
       cursor: pointer;
@@ -138,37 +131,63 @@
       cursor: not-allowed;
     }
     .status-foco {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: normal;
     }
     .item-checklist {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       background: white;
       padding: 16px;
       border-radius: 10px;
       margin-bottom: 10px;
     }
-    .item-checklist input {
+    .item-checklist input[type="checkbox"] {
       width: 24px;
       height: 24px;
-      margin-right: 14px;
+      min-width: 24px;
+      flex-shrink: 0;
+      margin: 2px 14px 0 0;
+      accent-color: #2563eb;
     }
     .item-checklist .textos {
       display: flex;
       flex-direction: column;
+      gap: 6px;
+      width: 100%;
     }
     .item-checklist .titulo {
+      font-family: Arial, sans-serif;
       font-size: 17px;
+      line-height: 1.3;
       font-weight: bold;
+      margin: 0;
     }
     .item-checklist .descricao {
+      font-family: Arial, sans-serif;
       font-size: 14px;
+      line-height: 1.3;
       color: #666;
+      margin: 0;
     }
     .item-checklist.concluido .titulo {
       text-decoration: line-through;
       color: #999;
+    }
+    .plano-acao {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      resize: vertical;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .plano-acao-label {
+      font-size: 12px;
+      color: #888;
+      margin: 0;
     }
   </style>
 </head>
@@ -450,7 +469,8 @@
       const { data: itens, error: erroItens } = await supabaseClient
         .from('itens_agenda')
         .select('*')
-        .eq('categoria', focoAtual.tipo);
+        .eq('categoria', focoAtual.tipo)
+        .order('ordem', { ascending: true });
 
       if (erroItens) {
         container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
@@ -478,6 +498,7 @@
       itens.forEach(item => {
         const execExistente = execucoesFoco.find(e => e.item_id === item.id);
         const jaConcluido = execExistente ? execExistente.concluido : false;
+        const planoExistente = execExistente && execExistente.observacao ? execExistente.observacao : '';
 
         const div = document.createElement('div');
         div.className = 'item-checklist' + (jaConcluido ? ' concluido' : '');
@@ -485,12 +506,36 @@
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = jaConcluido;
-        checkbox.onchange = () => marcarItemFoco(item, execExistente, checkbox.checked, div);
 
         const textos = document.createElement('div');
         textos.className = 'textos';
-        textos.innerHTML = '<span class="titulo">' + item.titulo + '</span>' +
-          (item.descricao ? '<span class="descricao">' + item.descricao + '</span>' : '');
+
+        const spanTitulo = document.createElement('span');
+        spanTitulo.className = 'titulo';
+        spanTitulo.textContent = item.titulo;
+        textos.appendChild(spanTitulo);
+
+        if (item.descricao) {
+          const spanDescricao = document.createElement('span');
+          spanDescricao.className = 'descricao';
+          spanDescricao.textContent = item.descricao;
+          textos.appendChild(spanDescricao);
+        }
+
+        const labelPlano = document.createElement('p');
+        labelPlano.className = 'plano-acao-label';
+        labelPlano.textContent = 'Plano de ação (se necessário):';
+        textos.appendChild(labelPlano);
+
+        const textareaPlano = document.createElement('textarea');
+        textareaPlano.className = 'plano-acao';
+        textareaPlano.rows = 2;
+        textareaPlano.placeholder = 'Descreva a ação, se houver algo a corrigir...';
+        textareaPlano.value = planoExistente;
+        textos.appendChild(textareaPlano);
+
+        checkbox.onchange = () => salvarItemFoco(item, execExistente, checkbox, textareaPlano, div);
+        textareaPlano.onblur = () => salvarItemFoco(item, execExistente, checkbox, textareaPlano, div);
 
         div.appendChild(checkbox);
         div.appendChild(textos);
@@ -498,13 +543,19 @@
       });
     }
 
-    async function marcarItemFoco(item, execExistente, concluido, divElemento) {
+    async function salvarItemFoco(item, execExistente, checkbox, textareaPlano, divElemento) {
+      const concluido = checkbox.checked;
+      const planoAcao = textareaPlano.value.trim() === '' ? null : textareaPlano.value.trim();
       const agora = new Date().toISOString();
 
       if (execExistente) {
         const { error } = await supabaseClient
           .from('execucoes')
-          .update({ concluido: concluido, hora_conclusao: concluido ? agora : null })
+          .update({
+            concluido: concluido,
+            hora_conclusao: concluido ? agora : null,
+            observacao: planoAcao
+          })
           .eq('id', execExistente.id);
 
         if (error) {
@@ -519,7 +570,8 @@
             lider_id: liderAtual.id,
             data: focoAtual.data,
             concluido: concluido,
-            hora_conclusao: concluido ? agora : null
+            hora_conclusao: concluido ? agora : null,
+            observacao: planoAcao
           });
 
         if (error) {
