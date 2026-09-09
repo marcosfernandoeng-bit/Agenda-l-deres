@@ -16,6 +16,13 @@
       text-align: center;
       color: #333;
     }
+    .subtitulo {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-top: -10px;
+      margin-bottom: 20px;
+    }
     #lista-lideres {
       display: flex;
       flex-direction: column;
@@ -33,7 +40,7 @@
     .botao-lider:active {
       background-color: #1d4ed8;
     }
-    #tela-checklist {
+    #tela-semana, #tela-foco {
       display: none;
     }
     .botao-voltar {
@@ -43,6 +50,60 @@
       font-size: 16px;
       margin-bottom: 10px;
       cursor: pointer;
+      padding: 0;
+    }
+    .card-dia {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .card-dia h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    .card-dia.dia-hoje {
+      border: 2px solid #2563eb;
+    }
+    .lista-rotina {
+      margin: 0 0 10px 0;
+      padding-left: 20px;
+      color: #555;
+      font-size: 14px;
+    }
+    .linha-rotina-check {
+      display: flex;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+    .linha-rotina-check input {
+      width: 22px;
+      height: 22px;
+      margin-right: 10px;
+    }
+    .linha-rotina-check span {
+      font-weight: bold;
+    }
+    .linha-foco {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #fef3c7;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 15px;
+      font-weight: bold;
+      color: #92400e;
+      cursor: pointer;
+      text-align: left;
+    }
+    .status-foco {
+      font-size: 13px;
+      font-weight: normal;
     }
     .item-checklist {
       display: flex;
@@ -83,11 +144,19 @@
     <div id="lista-lideres">Carregando líderes...</div>
   </div>
 
-  <!-- TELA 2: CHECKLIST -->
-  <div id="tela-checklist">
+  <!-- TELA 2: AGENDA DA SEMANA -->
+  <div id="tela-semana">
     <button class="botao-voltar" onclick="voltarParaSelecao()">&larr; Trocar líder</button>
-    <h1 id="nome-lider-checklist"></h1>
-    <div id="lista-itens">Carregando checklist...</div>
+    <h1 id="nome-lider-semana"></h1>
+    <p class="subtitulo">Expediente: 07:30 às 17:18</p>
+    <div id="lista-semana">Carregando agenda...</div>
+  </div>
+
+  <!-- TELA 3: CHECKLIST DE FOCO (5S / Qualidade / Segurança) -->
+  <div id="tela-foco">
+    <button class="botao-voltar" onclick="voltarParaSemana()">&larr; Voltar para a semana</button>
+    <h1 id="titulo-foco"></h1>
+    <div id="lista-foco">Carregando checklist...</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -98,16 +167,51 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let liderAtual = null;
+    let focoAtual = null; // { tipo, label, data }
+
+    const ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+    const NOMES_DIAS = {
+      segunda: 'Segunda-feira',
+      terca: 'Terça-feira',
+      quarta: 'Quarta-feira',
+      quinta: 'Quinta-feira',
+      sexta: 'Sexta-feira'
+    };
+    const FOCOS_POR_DIA = {
+      segunda: { tipo: '5s', label: '🧹 5S - Auto avaliação' },
+      quarta: { tipo: 'qualidade', label: '✅ Qualidade - Auto avaliação' },
+      sexta: { tipo: 'seguranca', label: '🦺 Segurança - Auto avaliação' }
+    };
+
+    function formatarISO(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
 
     function hojeISO() {
-      const d = new Date();
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return formatarISO(new Date());
     }
 
     function diaSemanaAtual() {
       const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
       return dias[new Date().getDay()];
     }
+
+    function obterDatasDaSemana() {
+      const hoje = new Date();
+      const diaSemanaNum = hoje.getDay();
+      const offsetSegunda = diaSemanaNum === 0 ? -6 : 1 - diaSemanaNum;
+      const segunda = new Date(hoje);
+      segunda.setDate(hoje.getDate() + offsetSegunda);
+
+      const resultado = {};
+      ORDEM_DIAS.forEach((dia, index) => {
+        const d = new Date(segunda);
+        d.setDate(segunda.getDate() + index);
+        resultado[dia] = formatarISO(d);
+      });
+      return resultado;
+    }
+
     async function carregarLideres() {
       const { data, error } = await supabaseClient.from('lideres').select('*').order('nome');
 
@@ -131,41 +235,46 @@
     function selecionarLider(lider) {
       liderAtual = lider;
       document.getElementById('tela-selecao').style.display = 'none';
-      document.getElementById('tela-checklist').style.display = 'block';
-      document.getElementById('nome-lider-checklist').textContent = 'Checklist de ' + lider.nome;
-      carregarChecklist();
+      document.getElementById('tela-semana').style.display = 'block';
+      document.getElementById('nome-lider-semana').textContent = 'Agenda de ' + lider.nome;
+      carregarSemana();
     }
 
     function voltarParaSelecao() {
       liderAtual = null;
-      document.getElementById('tela-checklist').style.display = 'none';
+      document.getElementById('tela-semana').style.display = 'none';
       document.getElementById('tela-selecao').style.display = 'block';
     }
 
-       async function carregarChecklist() {
-      const container = document.getElementById('lista-itens');
-      container.innerHTML = 'Carregando checklist...';
+    function voltarParaSemana() {
+      focoAtual = null;
+      document.getElementById('tela-foco').style.display = 'none';
+      document.getElementById('tela-semana').style.display = 'block';
+      carregarSemana();
+    }
 
-      const diaHoje = diaSemanaAtual();
+    async function carregarSemana() {
+      const container = document.getElementById('lista-semana');
+      container.innerHTML = 'Carregando agenda...';
+
+      const datas = obterDatasDaSemana();
+      const todasAsDatas = Object.values(datas);
 
       const { data: todosOsItens, error: erroItens } = await supabaseClient
         .from('itens_agenda')
         .select('*')
         .or('lider_id.eq.' + liderAtual.id + ',lider_id.is.null');
 
-      const itens = (todosOsItens || []).filter(item =>
-        item.dia_semana === 'todos' || item.dia_semana === diaHoje
-      );
       if (erroItens) {
         container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
         return;
       }
 
-      const { data: execucoesHoje, error: erroExec } = await supabaseClient
+      const { data: execucoesSemana, error: erroExec } = await supabaseClient
         .from('execucoes')
         .select('*')
         .eq('lider_id', liderAtual.id)
-        .eq('data', hojeISO());
+        .in('data', todasAsDatas);
 
       if (erroExec) {
         container.innerHTML = 'Erro ao carregar execuções: ' + erroExec.message;
@@ -173,35 +282,79 @@
       }
 
       container.innerHTML = '';
+      const diaHoje = diaSemanaAtual();
 
-      if (itens.length === 0) {
-        container.innerHTML = 'Nenhum item de agenda cadastrado para este líder ainda.';
-        return;
-      }
+      ORDEM_DIAS.forEach(dia => {
+        const dataDoDia = datas[dia];
 
-      itens.forEach(item => {
-        const execExistente = execucoesHoje.find(e => e.item_id === item.id);
-        const jaConcluido = execExistente ? execExistente.concluido : false;
+        const itensNormais = todosOsItens.filter(item =>
+          (item.dia_semana === 'todos' || item.dia_semana === dia) &&
+          (!item.categoria || item.categoria === '')
+        );
 
-        const div = document.createElement('div');
-        div.className = 'item-checklist' + (jaConcluido ? ' concluido' : '');
+        const card = document.createElement('div');
+        card.className = 'card-dia' + (dia === diaHoje ? ' dia-hoje' : '');
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = jaConcluido;
-        checkbox.onchange = () => marcarItem(item, execExistente, checkbox.checked, div);
+        const titulo = document.createElement('h3');
+        titulo.textContent = NOMES_DIAS[dia];
+        card.appendChild(titulo);
 
-        const textos = document.createElement('div');
-        textos.className = 'textos';
-        textos.innerHTML = '<span class="titulo">' + item.titulo + '</span>' +
-          (item.descricao ? '<span class="descricao">' + item.descricao + '</span>' : '');
+        if (itensNormais.length > 0) {
+          const ul = document.createElement('ul');
+          ul.className = 'lista-rotina';
+          itensNormais.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item.titulo;
+            ul.appendChild(li);
+          });
+          card.appendChild(ul);
 
-        div.appendChild(checkbox);
-        div.appendChild(textos);
-        container.appendChild(div);
+          const execRotina = execucoesSemana.find(e => e.item_id === null && e.data === dataDoDia);
+          const rotinaConcluida = execRotina ? execRotina.concluido : false;
+
+          const linhaCheck = document.createElement('div');
+          linhaCheck.className = 'linha-rotina-check';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = rotinaConcluida;
+          checkbox.onchange = () => marcarRotinaDia(dataDoDia, execRotina, checkbox.checked);
+
+          const label = document.createElement('span');
+          label.textContent = 'Rotina do dia cumprida';
+
+          linhaCheck.appendChild(checkbox);
+          linhaCheck.appendChild(label);
+          card.appendChild(linhaCheck);
+        } else {
+          const p = document.createElement('p');
+          p.className = 'lista-rotina';
+          p.textContent = 'Nenhum item de rotina cadastrado.';
+          card.appendChild(p);
+        }
+
+        const foco = FOCOS_POR_DIA[dia];
+        if (foco) {
+          const itensFoco = todosOsItens.filter(item => item.categoria === foco.tipo);
+          const execucoesFoco = execucoesSemana.filter(e =>
+            e.data === dataDoDia && itensFoco.some(i => i.id === e.item_id)
+          );
+          const fociConcluido = itensFoco.length > 0 &&
+            itensFoco.every(item => execucoesFoco.some(e => e.item_id === item.id && e.concluido));
+
+          const botaoFoco = document.createElement('button');
+          botaoFoco.className = 'linha-foco';
+          botaoFoco.innerHTML = '<span>' + foco.label + '</span>' +
+            '<span class="status-foco">' + (fociConcluido ? '✔️ Concluído' : 'Pendente') + '</span>';
+          botaoFoco.onclick = () => abrirFoco(foco.tipo, foco.label, dataDoDia);
+          card.appendChild(botaoFoco);
+        }
+
+        container.appendChild(card);
       });
     }
-    async function marcarItem(item, execExistente, concluido, divElemento) {
+
+    async function marcarRotinaDia(data, execExistente, concluido) {
       const agora = new Date().toISOString();
 
       if (execExistente) {
@@ -215,16 +368,111 @@
           return;
         }
       } else {
-        const { data, error } = await supabaseClient
+        const { error } = await supabaseClient
+          .from('execucoes')
+          .insert({
+            item_id: null,
+            lider_id: liderAtual.id,
+            data: data,
+            concluido: concluido,
+            hora_conclusao: concluido ? agora : null
+          });
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      }
+
+      carregarSemana();
+    }
+
+    function abrirFoco(tipo, label, data) {
+      focoAtual = { tipo: tipo, label: label, data: data };
+      document.getElementById('tela-semana').style.display = 'none';
+      document.getElementById('tela-foco').style.display = 'block';
+      document.getElementById('titulo-foco').textContent = label;
+      carregarFoco();
+    }
+
+    async function carregarFoco() {
+      const container = document.getElementById('lista-foco');
+      container.innerHTML = 'Carregando checklist...';
+
+      const { data: itens, error: erroItens } = await supabaseClient
+        .from('itens_agenda')
+        .select('*')
+        .eq('categoria', focoAtual.tipo);
+
+      if (erroItens) {
+        container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
+        return;
+      }
+
+      const { data: execucoesFoco, error: erroExec } = await supabaseClient
+        .from('execucoes')
+        .select('*')
+        .eq('lider_id', liderAtual.id)
+        .eq('data', focoAtual.data);
+
+      if (erroExec) {
+        container.innerHTML = 'Erro ao carregar execuções: ' + erroExec.message;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      if (itens.length === 0) {
+        container.innerHTML = 'Nenhum item cadastrado para este checklist ainda.';
+        return;
+      }
+
+      itens.forEach(item => {
+        const execExistente = execucoesFoco.find(e => e.item_id === item.id);
+        const jaConcluido = execExistente ? execExistente.concluido : false;
+
+        const div = document.createElement('div');
+        div.className = 'item-checklist' + (jaConcluido ? ' concluido' : '');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = jaConcluido;
+        checkbox.onchange = () => marcarItemFoco(item, execExistente, checkbox.checked, div);
+
+        const textos = document.createElement('div');
+        textos.className = 'textos';
+        textos.innerHTML = '<span class="titulo">' + item.titulo + '</span>' +
+          (item.descricao ? '<span class="descricao">' + item.descricao + '</span>' : '');
+
+        div.appendChild(checkbox);
+        div.appendChild(textos);
+        container.appendChild(div);
+      });
+    }
+
+    async function marcarItemFoco(item, execExistente, concluido, divElemento) {
+      const agora = new Date().toISOString();
+
+      if (execExistente) {
+        const { error } = await supabaseClient
+          .from('execucoes')
+          .update({ concluido: concluido, hora_conclusao: concluido ? agora : null })
+          .eq('id', execExistente.id);
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      } else {
+        const { error } = await supabaseClient
           .from('execucoes')
           .insert({
             item_id: item.id,
             lider_id: liderAtual.id,
-            data: hojeISO(),
+            data: focoAtual.data,
             concluido: concluido,
             hora_conclusao: concluido ? agora : null
-          })
-          .select();
+          });
 
         if (error) {
           alert('Erro ao salvar: ' + error.message);
@@ -233,7 +481,7 @@
       }
 
       divElemento.classList.toggle('concluido', concluido);
-      carregarChecklist();
+      carregarFoco();
     }
 
     carregarLideres();
