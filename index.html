@@ -343,11 +343,12 @@
         const dataDoDia = datas[dia];
         const estaDisponivel = (dia === diaHoje);
 
-        const itensNormais = todosOsItens.filter(item =>
-          (item.dia_semana === 'todos' || item.dia_semana === dia) &&
-          (!item.categoria || item.categoria === '')
-        );
-
+        const itensNormais = todosOsItens
+          .filter(item =>
+            (item.dia_semana === 'todos' || item.dia_semana === dia) &&
+            (!item.categoria || item.categoria === '')
+          )
+          .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
         const card = document.createElement('div');
         card.className = 'card-dia' + (estaDisponivel ? ' dia-hoje' : ' dia-bloqueado');
 
