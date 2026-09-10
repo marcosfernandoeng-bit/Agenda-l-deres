@@ -423,12 +423,29 @@
         titulo.textContent = NOMES_DIAS[dia];
         conteudoCard.appendChild(titulo);
 
-        if (itensNormais.length > 0) {
+                if (itensNormais.length > 0) {
           const ul = document.createElement('ul');
           ul.className = 'lista-rotina';
           itensNormais.forEach(item => {
             const li = document.createElement('li');
-            li.textContent = item.titulo;
+
+            const spanTitulo = document.createElement('span');
+            spanTitulo.className = 'titulo-item-rotina';
+            spanTitulo.textContent = item.titulo;
+            li.appendChild(spanTitulo);
+
+            if (item.descricao) {
+              const caixaObs = document.createElement('div');
+              caixaObs.className = 'caixa-observacao';
+              caixaObs.style.display = 'none';
+              caixaObs.textContent = item.descricao;
+              li.appendChild(caixaObs);
+
+              spanTitulo.onclick = () => {
+                caixaObs.style.display = (caixaObs.style.display === 'none') ? 'block' : 'none';
+              };
+            }
+
             ul.appendChild(li);
           });
           conteudoCard.appendChild(ul);
