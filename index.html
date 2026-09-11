@@ -31,6 +31,10 @@
       max-width: 640px;
       margin: 0 auto;
     }
+    .conteudo-largo {
+      max-width: 900px;
+      margin: 0 auto;
+    }
     h1 {
       text-align: center;
       color: var(--azul);
@@ -400,6 +404,7 @@
       padding: 10px 0;
       border-bottom: 1px solid #eef2f7;
       font-size: 13.5px;
+      gap: 10px;
     }
     .linha-item-acompanhado:last-child {
       border-bottom: none;
@@ -410,6 +415,11 @@
       background-color: var(--cinza-fundo);
       padding: 3px 10px;
       border-radius: 6px;
+      white-space: nowrap;
+    }
+    .grupo-badges-linha {
+      display: flex;
+      gap: 6px;
     }
   </style>
 </head>
@@ -425,7 +435,7 @@
   <div id="tela-semana">
     <div class="barra-topo-semana">
       <button class="botao-voltar" onclick="voltarParaSelecao()">&larr; Trocar líder</button>
-      <button class="link-indicadores" onclick="abrirIndicadores()">📊 Meus indicadores</button>
+      <button id="botao-link-indicadores" class="link-indicadores" onclick="abrirIndicadores()">📊 Meus indicadores</button>
     </div>
     <h1 id="nome-lider-semana"></h1>
     <p class="subtitulo">Expediente: 07:30 às 17:18</p>
@@ -440,7 +450,7 @@
   </div>
 
   <!-- TELA 4: INDICADORES -->
-  <div id="tela-indicadores" class="conteudo-estreito">
+  <div id="tela-indicadores" class="conteudo-largo">
     <button class="botao-voltar" onclick="voltarIndicadoresParaSemana()">&larr; Voltar para a agenda</button>
     <h1 id="nome-lider-indicadores"></h1>
     <p class="subtitulo">Histórico completo</p>
@@ -543,6 +553,7 @@
       document.getElementById('tela-selecao').style.display = 'none';
       document.getElementById('tela-semana').style.display = 'block';
       document.getElementById('nome-lider-semana').textContent = 'Agenda de ' + lider.nome;
+      document.getElementById('botao-link-indicadores').textContent = lider.eh_gestor ? '📊 Painel do Gestor' : '📊 Meus indicadores';
       carregarSemana();
     }
 
@@ -990,8 +1001,14 @@
     function abrirIndicadores() {
       document.getElementById('tela-semana').style.display = 'none';
       document.getElementById('tela-indicadores').style.display = 'block';
-      document.getElementById('nome-lider-indicadores').textContent = 'Indicadores de ' + liderAtual.nome;
-      carregarIndicadores();
+
+      if (liderAtual.eh_gestor) {
+        document.getElementById('nome-lider-indicadores').textContent = 'Painel do Gestor';
+        carregarPainelGestor();
+      } else {
+        document.getElementById('nome-lider-indicadores').textContent = 'Indicadores de ' + liderAtual.nome;
+        carregarIndicadores();
+      }
     }
 
     function voltarIndicadoresParaSemana() {
@@ -1038,13 +1055,11 @@
       const dataInicio = (primeiraExec && primeiraExec.length > 0) ? primeiraExec[0].data : hojeISO();
       const diasUteis = gerarDiasUteis(dataInicio, hojeISO());
 
-      // Indicador de aderência à rotina
       const diasComRotina = diasUteis.filter(d =>
         todasExecucoesDoLider.some(e => e.item_id === null && e.contexto === 'rotina_dia' && e.data === d.data && e.concluido)
       ).length;
       const percRotina = diasUteis.length > 0 ? Math.round((diasComRotina / diasUteis.length) * 100) : 0;
 
-      // Indicador de aderência às atividades foco
       const diasComFoco = diasUteis.filter(d => FOCOS_POR_DIA[d.diaSemana]);
       let focoCumpridosTotal = 0;
       const focoPorTipo = { '5s': { total: 0, cumpridos: 0 }, 'qualidade': { total: 0, cumpridos: 0 }, 'seguranca': { total: 0, cumpridos: 0 } };
@@ -1066,7 +1081,6 @@
 
       container.innerHTML = '';
 
-      // Cartões de resumo
       const cartoes = document.createElement('div');
       cartoes.className = 'cartoes-resumo';
 
@@ -1089,7 +1103,6 @@
 
       container.appendChild(cartoes);
 
-      // Acompanhamento de notas por atividade foco
       ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
         const itensDoTipo = itensRelevantes
           .filter(i => i.categoria === tipo)
@@ -1106,6 +1119,175 @@
 
         itensDoTipo.forEach(item => {
           const notas = todasExecucoesDoLider
+            .filter(e => e.item_id === item.id && e.nota)
+            .map(e => e.nota);
+
+          const media = notas.length > 0 ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) : '—';
+
+          const linha = document.createElement('div');
+          linha.className = 'linha-item-acompanhado';
+          linha.innerHTML = '<span>' + item.titulo + ' <span style="color: var(--texto-secundario); font-size: 11px;">(' + notas.length + ' avaliações)</span></span>' +
+            '<span class="media-nota">' + media + '</span>';
+          secao.appendChild(linha);
+        });
+
+        container.appendChild(secao);
+      });
+    }
+
+    async function carregarPainelGestor() {
+      const container = document.getElementById('conteudo-indicadores');
+      container.innerHTML = 'Carregando painel...';
+
+      const { data: todosLideres, error: erroLideres } = await supabaseClient
+        .from('lideres')
+        .select('*')
+        .eq('eh_gestor', false)
+        .order('nome');
+
+      if (erroLideres) {
+        container.innerHTML = 'Erro ao carregar líderes: ' + erroLideres.message;
+        return;
+      }
+
+      const { data: todosItens, error: erroItens } = await supabaseClient
+        .from('itens_agenda')
+        .select('*');
+
+      if (erroItens) {
+        container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
+        return;
+      }
+
+      const { data: todasExecucoes, error: erroExec } = await supabaseClient
+        .from('execucoes')
+        .select('*');
+
+      if (erroExec) {
+        container.innerHTML = 'Erro ao carregar execuções: ' + erroExec.message;
+        return;
+      }
+
+      let dataInicio = hojeISO();
+      if (todasExecucoes.length > 0) {
+        dataInicio = todasExecucoes.reduce((min, e) => (e.data < min ? e.data : min), todasExecucoes[0].data);
+      }
+      const diasUteis = gerarDiasUteis(dataInicio, hojeISO());
+      const diasComFoco = diasUteis.filter(d => FOCOS_POR_DIA[d.diaSemana]);
+
+      const resultadosPorLider = todosLideres.map(lider => {
+        const execsDoLider = todasExecucoes.filter(e => e.lider_id === lider.id);
+        const itensDoLider = todosItens.filter(i => i.lider_id === lider.id || i.lider_id === null);
+
+        const diasComRotina = diasUteis.filter(d =>
+          execsDoLider.some(e => e.item_id === null && e.contexto === 'rotina_dia' && e.data === d.data && e.concluido)
+        ).length;
+        const percRotina = diasUteis.length > 0 ? Math.round((diasComRotina / diasUteis.length) * 100) : 0;
+
+        let focoCumpridos = 0;
+        diasComFoco.forEach(d => {
+          const tipo = FOCOS_POR_DIA[d.diaSemana].tipo;
+          const itensDoTipo = itensDoLider.filter(i => i.categoria === tipo);
+          const cumpriu = itensDoTipo.length > 0 &&
+            itensDoTipo.every(item => execsDoLider.some(e => e.item_id === item.id && e.data === d.data && e.nota));
+          if (cumpriu) focoCumpridos++;
+        });
+        const percFoco = diasComFoco.length > 0 ? Math.round((focoCumpridos / diasComFoco.length) * 100) : 0;
+
+        return { nome: lider.nome, percRotina: percRotina, percFoco: percFoco };
+      });
+
+      resultadosPorLider.sort((a, b) => b.percRotina - a.percRotina);
+
+      const mediaRotina = resultadosPorLider.length > 0 ?
+        Math.round(resultadosPorLider.reduce((s, r) => s + r.percRotina, 0) / resultadosPorLider.length) : 0;
+      const mediaFoco = resultadosPorLider.length > 0 ?
+        Math.round(resultadosPorLider.reduce((s, r) => s + r.percFoco, 0) / resultadosPorLider.length) : 0;
+
+      const focoPorTipoConsolidado = { '5s': [], qualidade: [], seguranca: [] };
+      todosLideres.forEach(lider => {
+        const execsDoLider = todasExecucoes.filter(e => e.lider_id === lider.id);
+        const itensDoLider = todosItens.filter(i => i.lider_id === lider.id || i.lider_id === null);
+
+        ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+          const diasDesseTipo = diasComFoco.filter(d => FOCOS_POR_DIA[d.diaSemana].tipo === tipo);
+          const itensDoTipo = itensDoLider.filter(i => i.categoria === tipo);
+          let cumpridos = 0;
+          diasDesseTipo.forEach(d => {
+            const cumpriu = itensDoTipo.length > 0 &&
+              itensDoTipo.every(item => execsDoLider.some(e => e.item_id === item.id && e.data === d.data && e.nota));
+            if (cumpriu) cumpridos++;
+          });
+          if (diasDesseTipo.length > 0) {
+            focoPorTipoConsolidado[tipo].push(Math.round((cumpridos / diasDesseTipo.length) * 100));
+          }
+        });
+      });
+
+      const mediaPorTipo = {};
+      ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+        const arr = focoPorTipoConsolidado[tipo];
+        mediaPorTipo[tipo] = arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+      });
+
+      container.innerHTML = '';
+
+      const cartoes = document.createElement('div');
+      cartoes.className = 'cartoes-resumo';
+
+      const cartaoRotina = document.createElement('div');
+      cartaoRotina.className = 'cartao-resumo';
+      cartaoRotina.innerHTML = '<div class="numero-grande">' + mediaRotina + '%</div><div class="rotulo-cartao">Aderência à Rotina (média da equipe)</div>';
+      cartoes.appendChild(cartaoRotina);
+
+      const cartaoFoco = document.createElement('div');
+      cartaoFoco.className = 'cartao-resumo';
+      let badgesHtml = '<div class="badges-foco">';
+      ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+        badgesHtml += '<span class="badge-foco">' + NOMES_FOCO[tipo] + ': ' + mediaPorTipo[tipo] + '%</span>';
+      });
+      badgesHtml += '</div>';
+      cartaoFoco.innerHTML = '<div class="numero-grande">' + mediaFoco + '%</div><div class="rotulo-cartao">Aderência às Atividades Foco (média da equipe)</div>' + badgesHtml;
+      cartoes.appendChild(cartaoFoco);
+
+      container.appendChild(cartoes);
+
+      const secaoRanking = document.createElement('div');
+      secaoRanking.className = 'secao-acompanhamento';
+
+      const tituloRanking = document.createElement('h3');
+      tituloRanking.textContent = 'Ranking por líder';
+      secaoRanking.appendChild(tituloRanking);
+
+      resultadosPorLider.forEach(r => {
+        const linha = document.createElement('div');
+        linha.className = 'linha-item-acompanhado';
+        linha.innerHTML = '<span>' + r.nome + '</span>' +
+          '<span class="grupo-badges-linha">' +
+          '<span class="media-nota">Rotina: ' + r.percRotina + '%</span>' +
+          '<span class="media-nota">Foco: ' + r.percFoco + '%</span>' +
+          '</span>';
+        secaoRanking.appendChild(linha);
+      });
+
+      container.appendChild(secaoRanking);
+
+      ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+        const itensDoTipo = todosItens
+          .filter(i => i.categoria === tipo)
+          .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+        if (itensDoTipo.length === 0) return;
+
+        const secao = document.createElement('div');
+        secao.className = 'secao-acompanhamento';
+
+        const tituloSecao = document.createElement('h3');
+        tituloSecao.textContent = 'Notas de autoavaliação (toda a equipe) — ' + NOMES_FOCO[tipo];
+        secao.appendChild(tituloSecao);
+
+        itensDoTipo.forEach(item => {
+          const notas = todasExecucoes
             .filter(e => e.item_id === item.id && e.nota)
             .map(e => e.nota);
 
