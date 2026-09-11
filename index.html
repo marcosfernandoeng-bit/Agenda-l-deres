@@ -66,7 +66,7 @@
     .botao-lider:hover {
       background-color: var(--azul-escuro);
     }
-    #tela-semana, #tela-foco {
+    #tela-semana, #tela-foco, #tela-indicadores {
       display: none;
     }
     .botao-voltar {
@@ -79,6 +79,29 @@
       margin-bottom: 16px;
       cursor: pointer;
       padding: 0;
+    }
+    .barra-topo-semana {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 640px;
+      margin: 0 auto 6px auto;
+    }
+    .link-indicadores {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-family: 'Lato', Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 8px 14px;
+      border: 2px solid var(--azul);
+      border-radius: 8px;
+    }
+    .link-indicadores:hover {
+      background-color: var(--azul);
+      color: white;
     }
     #lista-semana {
       display: grid;
@@ -320,6 +343,74 @@
     .botao-salvar-foco:hover {
       background-color: var(--azul-escuro);
     }
+    .cartoes-resumo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .cartao-resumo {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(40, 73, 114, 0.08);
+    }
+    .cartao-resumo .numero-grande {
+      font-size: 34px;
+      font-weight: 900;
+      color: var(--azul);
+    }
+    .cartao-resumo .rotulo-cartao {
+      font-size: 13px;
+      color: var(--texto-secundario);
+      margin-top: 4px;
+    }
+    .badges-foco {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .badge-foco {
+      background-color: var(--laranja-claro);
+      color: var(--laranja);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .secao-acompanhamento {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 10px rgba(40, 73, 114, 0.08);
+    }
+    .secao-acompanhamento h3 {
+      color: var(--azul);
+      font-size: 16px;
+      margin: 0 0 14px 0;
+    }
+    .linha-item-acompanhado {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #eef2f7;
+      font-size: 13.5px;
+    }
+    .linha-item-acompanhado:last-child {
+      border-bottom: none;
+    }
+    .media-nota {
+      font-weight: 700;
+      color: var(--azul);
+      background-color: var(--cinza-fundo);
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
@@ -332,7 +423,10 @@
 
   <!-- TELA 2: AGENDA DA SEMANA -->
   <div id="tela-semana">
-    <button class="botao-voltar" onclick="voltarParaSelecao()">&larr; Trocar líder</button>
+    <div class="barra-topo-semana">
+      <button class="botao-voltar" onclick="voltarParaSelecao()">&larr; Trocar líder</button>
+      <button class="link-indicadores" onclick="abrirIndicadores()">📊 Meus indicadores</button>
+    </div>
     <h1 id="nome-lider-semana"></h1>
     <p class="subtitulo">Expediente: 07:30 às 17:18</p>
     <div id="lista-semana">Carregando agenda...</div>
@@ -343,6 +437,14 @@
     <button class="botao-voltar" onclick="voltarParaSemana()">&larr; Voltar para a semana</button>
     <h1 id="titulo-foco"></h1>
     <div id="lista-foco">Carregando checklist...</div>
+  </div>
+
+  <!-- TELA 4: INDICADORES -->
+  <div id="tela-indicadores" class="conteudo-estreito">
+    <button class="botao-voltar" onclick="voltarIndicadoresParaSemana()">&larr; Voltar para a agenda</button>
+    <h1 id="nome-lider-indicadores"></h1>
+    <p class="subtitulo">Histórico completo</p>
+    <div id="conteudo-indicadores">Carregando indicadores...</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -368,6 +470,7 @@
       quarta: { tipo: 'qualidade', label: '🔍 Qualidade - Auto avaliação' },
       sexta: { tipo: 'seguranca', label: '🦺 Segurança - Auto avaliação' }
     };
+    const NOMES_FOCO = { '5s': '5S', 'qualidade': 'Qualidade', 'seguranca': 'Segurança' };
     const ROTULOS_NOTA = { 1: 'Ruim', 2: 'Regular', 3: 'Bom', 4: 'Ótimo', 5: 'Excelente' };
 
     function formatarISO(d) {
@@ -396,6 +499,22 @@
         d.setDate(segunda.getDate() + index);
         resultado[dia] = formatarISO(d);
       });
+      return resultado;
+    }
+
+    function gerarDiasUteis(dataInicioStr, dataFimStr) {
+      const nomes = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const inicio = new Date(dataInicioStr + 'T00:00:00');
+      const fim = new Date(dataFimStr + 'T00:00:00');
+      const resultado = [];
+      let atual = new Date(inicio);
+      while (atual <= fim) {
+        const diaSemanaNum = atual.getDay();
+        if (diaSemanaNum >= 1 && diaSemanaNum <= 5) {
+          resultado.push({ data: formatarISO(atual), diaSemana: nomes[diaSemanaNum] });
+        }
+        atual.setDate(atual.getDate() + 1);
+      }
       return resultado;
     }
 
@@ -866,6 +985,141 @@
       }
 
       carregarFoco();
+    }
+
+    function abrirIndicadores() {
+      document.getElementById('tela-semana').style.display = 'none';
+      document.getElementById('tela-indicadores').style.display = 'block';
+      document.getElementById('nome-lider-indicadores').textContent = 'Indicadores de ' + liderAtual.nome;
+      carregarIndicadores();
+    }
+
+    function voltarIndicadoresParaSemana() {
+      document.getElementById('tela-indicadores').style.display = 'none';
+      document.getElementById('tela-semana').style.display = 'block';
+      carregarSemana();
+    }
+
+    async function carregarIndicadores() {
+      const container = document.getElementById('conteudo-indicadores');
+      container.innerHTML = 'Carregando indicadores...';
+
+      const { data: todasExecucoesDoLider, error: erroExec } = await supabaseClient
+        .from('execucoes')
+        .select('*')
+        .eq('lider_id', liderAtual.id);
+
+      if (erroExec) {
+        container.innerHTML = 'Erro ao carregar dados: ' + erroExec.message;
+        return;
+      }
+
+      const { data: itensRelevantes, error: erroItens } = await supabaseClient
+        .from('itens_agenda')
+        .select('*')
+        .or('lider_id.eq.' + liderAtual.id + ',lider_id.is.null');
+
+      if (erroItens) {
+        container.innerHTML = 'Erro ao carregar itens: ' + erroItens.message;
+        return;
+      }
+
+      const { data: primeiraExec, error: erroPrimeira } = await supabaseClient
+        .from('execucoes')
+        .select('data')
+        .order('data', { ascending: true })
+        .limit(1);
+
+      if (erroPrimeira) {
+        container.innerHTML = 'Erro ao carregar histórico: ' + erroPrimeira.message;
+        return;
+      }
+
+      const dataInicio = (primeiraExec && primeiraExec.length > 0) ? primeiraExec[0].data : hojeISO();
+      const diasUteis = gerarDiasUteis(dataInicio, hojeISO());
+
+      // Indicador de aderência à rotina
+      const diasComRotina = diasUteis.filter(d =>
+        todasExecucoesDoLider.some(e => e.item_id === null && e.contexto === 'rotina_dia' && e.data === d.data && e.concluido)
+      ).length;
+      const percRotina = diasUteis.length > 0 ? Math.round((diasComRotina / diasUteis.length) * 100) : 0;
+
+      // Indicador de aderência às atividades foco
+      const diasComFoco = diasUteis.filter(d => FOCOS_POR_DIA[d.diaSemana]);
+      let focoCumpridosTotal = 0;
+      const focoPorTipo = { '5s': { total: 0, cumpridos: 0 }, 'qualidade': { total: 0, cumpridos: 0 }, 'seguranca': { total: 0, cumpridos: 0 } };
+
+      diasComFoco.forEach(d => {
+        const tipo = FOCOS_POR_DIA[d.diaSemana].tipo;
+        const itensDoTipo = itensRelevantes.filter(i => i.categoria === tipo);
+        const cumpriu = itensDoTipo.length > 0 &&
+          itensDoTipo.every(item => todasExecucoesDoLider.some(e => e.item_id === item.id && e.data === d.data && e.nota));
+
+        focoPorTipo[tipo].total++;
+        if (cumpriu) {
+          focoPorTipo[tipo].cumpridos++;
+          focoCumpridosTotal++;
+        }
+      });
+
+      const percFocoGeral = diasComFoco.length > 0 ? Math.round((focoCumpridosTotal / diasComFoco.length) * 100) : 0;
+
+      container.innerHTML = '';
+
+      // Cartões de resumo
+      const cartoes = document.createElement('div');
+      cartoes.className = 'cartoes-resumo';
+
+      const cartaoRotina = document.createElement('div');
+      cartaoRotina.className = 'cartao-resumo';
+      cartaoRotina.innerHTML = '<div class="numero-grande">' + percRotina + '%</div><div class="rotulo-cartao">Aderência à Rotina</div>';
+      cartoes.appendChild(cartaoRotina);
+
+      const cartaoFoco = document.createElement('div');
+      cartaoFoco.className = 'cartao-resumo';
+      let badgesHtml = '<div class="badges-foco">';
+      ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+        const t = focoPorTipo[tipo];
+        const pct = t.total > 0 ? Math.round((t.cumpridos / t.total) * 100) : 0;
+        badgesHtml += '<span class="badge-foco">' + NOMES_FOCO[tipo] + ': ' + pct + '%</span>';
+      });
+      badgesHtml += '</div>';
+      cartaoFoco.innerHTML = '<div class="numero-grande">' + percFocoGeral + '%</div><div class="rotulo-cartao">Aderência às Atividades Foco</div>' + badgesHtml;
+      cartoes.appendChild(cartaoFoco);
+
+      container.appendChild(cartoes);
+
+      // Acompanhamento de notas por atividade foco
+      ['5s', 'qualidade', 'seguranca'].forEach(tipo => {
+        const itensDoTipo = itensRelevantes
+          .filter(i => i.categoria === tipo)
+          .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+        if (itensDoTipo.length === 0) return;
+
+        const secao = document.createElement('div');
+        secao.className = 'secao-acompanhamento';
+
+        const tituloSecao = document.createElement('h3');
+        tituloSecao.textContent = 'Notas de autoavaliação — ' + NOMES_FOCO[tipo];
+        secao.appendChild(tituloSecao);
+
+        itensDoTipo.forEach(item => {
+          const notas = todasExecucoesDoLider
+            .filter(e => e.item_id === item.id && e.nota)
+            .map(e => e.nota);
+
+          const media = notas.length > 0 ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) : '—';
+
+          const linha = document.createElement('div');
+          linha.className = 'linha-item-acompanhado';
+          linha.innerHTML = '<span>' + item.titulo + ' <span style="color: var(--texto-secundario); font-size: 11px;">(' + notas.length + ' avaliações)</span></span>' +
+            '<span class="media-nota">' + media + '</span>';
+          secao.appendChild(linha);
+        });
+
+        container.appendChild(secao);
+      });
     }
 
     carregarLideres();
