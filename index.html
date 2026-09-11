@@ -210,14 +210,6 @@
       margin-bottom: 18px;
       box-shadow: 0 2px 10px rgba(40, 73, 114, 0.08);
     }
-    .item-checklist input[type="checkbox"] {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      flex-shrink: 0;
-      margin: 2px 16px 0 0;
-      accent-color: var(--azul);
-    }
     .item-checklist .textos {
       display: flex;
       flex-direction: column;
@@ -239,9 +231,45 @@
       color: var(--texto-secundario);
       margin: 0;
     }
-    .item-checklist.concluido .titulo {
-      text-decoration: line-through;
-      color: #a3b0bf;
+    .notas-container {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .botao-nota {
+      flex: 1;
+      min-width: 58px;
+      padding: 10px 4px;
+      border-radius: 8px;
+      border: 2px solid #dbe3ec;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      font-family: 'Lato', Arial, sans-serif;
+    }
+    .botao-nota .numero {
+      font-weight: 900;
+      font-size: 17px;
+      display: block;
+      color: var(--azul);
+    }
+    .botao-nota .rotulo {
+      font-size: 10px;
+      color: var(--texto-secundario);
+    }
+    .botao-nota.selecionada {
+      border-color: var(--azul);
+      background-color: #eaf0fa;
+    }
+    .aviso-obrigatorio {
+      color: #c0392b;
+      font-size: 12px;
+      margin: 2px 0 0 0;
+      display: none;
+    }
+    .aviso-obrigatorio.visivel {
+      display: block;
     }
     .plano-acao {
       font-family: 'Lato', Arial, sans-serif;
@@ -262,6 +290,18 @@
       font-size: 12px;
       color: var(--texto-secundario);
       margin: 4px 0 0 0;
+    }
+    .observacoes-gerais {
+      background: white;
+      border-radius: 14px;
+      padding: 22px;
+      margin-top: 6px;
+      box-shadow: 0 2px 10px rgba(40, 73, 114, 0.08);
+    }
+    .observacoes-gerais h4 {
+      margin: 0 0 8px 0;
+      color: var(--azul);
+      font-size: 15px;
     }
   </style>
 </head>
@@ -308,9 +348,10 @@
     };
     const FOCOS_POR_DIA = {
       segunda: { tipo: '5s', label: '🧹 5S - Auto avaliação' },
-      quarta: { tipo: 'qualidade', label: '✅ Qualidade - Auto avaliação' },
+      quarta: { tipo: 'qualidade', label: '🔍 Qualidade - Auto avaliação' },
       sexta: { tipo: 'seguranca', label: '🦺 Segurança - Auto avaliação' }
     };
+    const ROTULOS_NOTA = { 1: 'Ruim', 2: 'Regular', 3: 'Bom', 4: 'Ótimo', 5: 'Excelente' };
 
     function formatarISO(d) {
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -438,7 +479,7 @@
         titulo.textContent = NOMES_DIAS[dia];
         conteudoCard.appendChild(titulo);
 
-                if (itensNormais.length > 0) {
+        if (itensNormais.length > 0) {
           const ul = document.createElement('ul');
           ul.className = 'lista-rotina';
           itensNormais.forEach(item => {
@@ -465,7 +506,7 @@
           });
           conteudoCard.appendChild(ul);
 
-          const execRotina = execucoesSemana.find(e => e.item_id === null && e.data === dataDoDia);
+          const execRotina = execucoesSemana.find(e => e.item_id === null && e.data === dataDoDia && e.contexto !== 'obs_geral_foco');
           const rotinaConcluida = execRotina ? execRotina.concluido : false;
 
           const linhaCheck = document.createElement('div');
@@ -504,7 +545,7 @@
             e.data === dataDoDia && itensFoco.some(i => i.id === e.item_id)
           );
           const focoConcluido = itensFoco.length > 0 &&
-            itensFoco.every(item => execucoesFoco.some(e => e.item_id === item.id && e.concluido));
+            itensFoco.every(item => execucoesFoco.some(e => e.item_id === item.id && e.nota));
 
           const botaoFoco = document.createElement('button');
           botaoFoco.className = 'linha-foco';
@@ -543,7 +584,8 @@
             lider_id: liderAtual.id,
             data: data,
             concluido: concluido,
-            hora_conclusao: concluido ? agora : null
+            hora_conclusao: concluido ? agora : null,
+            contexto: 'rotina_dia'
           });
 
         if (error) {
@@ -598,15 +640,11 @@
 
       itens.forEach(item => {
         const execExistente = execucoesFoco.find(e => e.item_id === item.id);
-        const jaConcluido = execExistente ? execExistente.concluido : false;
+        const notaExistente = execExistente ? execExistente.nota : null;
         const planoExistente = execExistente && execExistente.observacao ? execExistente.observacao : '';
 
         const div = document.createElement('div');
-        div.className = 'item-checklist' + (jaConcluido ? ' concluido' : '');
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = jaConcluido;
+        div.className = 'item-checklist';
 
         const textos = document.createElement('div');
         textos.className = 'textos';
@@ -623,39 +661,100 @@
           textos.appendChild(spanDescricao);
         }
 
+        const notasContainer = document.createElement('div');
+        notasContainer.className = 'notas-container';
+
+        const avisoObrigatorio = document.createElement('p');
+        avisoObrigatorio.className = 'aviso-obrigatorio';
+        avisoObrigatorio.textContent = 'Nota 3 ou menor exige plano de ação preenchido.';
+
         const labelPlano = document.createElement('p');
         labelPlano.className = 'plano-acao-label';
-        labelPlano.textContent = 'Plano de ação (se necessário):';
-        textos.appendChild(labelPlano);
+        labelPlano.textContent = 'Plano de ação:';
 
         const textareaPlano = document.createElement('textarea');
         textareaPlano.className = 'plano-acao';
         textareaPlano.rows = 2;
-        textareaPlano.placeholder = 'Descreva a ação, se houver algo a corrigir...';
+        textareaPlano.placeholder = 'Descreva a ação corretiva, se necessário...';
         textareaPlano.value = planoExistente;
+
+        function notaAtualSelecionada() {
+          const botaoSelecionado = notasContainer.querySelector('.botao-nota.selecionada');
+          return botaoSelecionado ? parseInt(botaoSelecionado.querySelector('.numero').textContent) : null;
+        }
+
+        function atualizarAviso() {
+          const n = notaAtualSelecionada();
+          const precisaPlano = n !== null && n <= 3;
+          const planoPreenchido = textareaPlano.value.trim() !== '';
+          avisoObrigatorio.classList.toggle('visivel', precisaPlano && !planoPreenchido);
+        }
+
+        [1, 2, 3, 4, 5].forEach(n => {
+          const botaoNota = document.createElement('button');
+          botaoNota.type = 'button';
+          botaoNota.className = 'botao-nota' + (notaExistente === n ? ' selecionada' : '');
+          botaoNota.innerHTML = '<span class="numero">' + n + '</span><span class="rotulo">' + ROTULOS_NOTA[n] + '</span>';
+          botaoNota.onclick = () => {
+            notasContainer.querySelectorAll('.botao-nota').forEach(b => b.classList.remove('selecionada'));
+            botaoNota.classList.add('selecionada');
+            atualizarAviso();
+            salvarItemFoco(item, execExistente, n, textareaPlano.value.trim());
+          };
+          notasContainer.appendChild(botaoNota);
+        });
+
+        textareaPlano.onblur = () => {
+          atualizarAviso();
+          const n = notaAtualSelecionada();
+          if (n !== null) {
+            salvarItemFoco(item, execExistente, n, textareaPlano.value.trim());
+          }
+        };
+
+        textos.appendChild(notasContainer);
+        textos.appendChild(avisoObrigatorio);
+        textos.appendChild(labelPlano);
         textos.appendChild(textareaPlano);
 
-        checkbox.onchange = () => salvarItemFoco(item, execExistente, checkbox, textareaPlano, div);
-        textareaPlano.onblur = () => salvarItemFoco(item, execExistente, checkbox, textareaPlano, div);
+        atualizarAviso();
 
-        div.appendChild(checkbox);
         div.appendChild(textos);
         container.appendChild(div);
       });
+
+      const execGeral = execucoesFoco.find(e => e.item_id === null && e.contexto === 'obs_geral_foco');
+
+      const boxGeral = document.createElement('div');
+      boxGeral.className = 'observacoes-gerais';
+
+      const tituloGeral = document.createElement('h4');
+      tituloGeral.textContent = 'Observações gerais do checklist';
+      boxGeral.appendChild(tituloGeral);
+
+      const textareaGeral = document.createElement('textarea');
+      textareaGeral.className = 'plano-acao';
+      textareaGeral.rows = 3;
+      textareaGeral.placeholder = 'Alguma observação sobre o checklist de hoje...';
+      textareaGeral.value = execGeral && execGeral.observacao ? execGeral.observacao : '';
+      textareaGeral.onblur = () => salvarObservacaoGeral(execGeral, textareaGeral.value.trim());
+      boxGeral.appendChild(textareaGeral);
+
+      container.appendChild(boxGeral);
     }
 
-    async function salvarItemFoco(item, execExistente, checkbox, textareaPlano, divElemento) {
-      const concluido = checkbox.checked;
-      const planoAcao = textareaPlano.value.trim() === '' ? null : textareaPlano.value.trim();
+    async function salvarItemFoco(item, execExistente, nota, planoAcao) {
       const agora = new Date().toISOString();
+      const observacaoFinal = planoAcao === '' ? null : planoAcao;
 
       if (execExistente) {
         const { error } = await supabaseClient
           .from('execucoes')
           .update({
-            concluido: concluido,
-            hora_conclusao: concluido ? agora : null,
-            observacao: planoAcao
+            nota: nota,
+            concluido: true,
+            hora_conclusao: agora,
+            observacao: observacaoFinal
           })
           .eq('id', execExistente.id);
 
@@ -670,9 +769,10 @@
             item_id: item.id,
             lider_id: liderAtual.id,
             data: focoAtual.data,
-            concluido: concluido,
-            hora_conclusao: concluido ? agora : null,
-            observacao: planoAcao
+            nota: nota,
+            concluido: true,
+            hora_conclusao: agora,
+            observacao: observacaoFinal
           });
 
         if (error) {
@@ -681,7 +781,41 @@
         }
       }
 
-      divElemento.classList.toggle('concluido', concluido);
+      carregarFoco();
+    }
+
+    async function salvarObservacaoGeral(execExistente, texto) {
+      const observacaoFinal = texto === '' ? null : texto;
+
+      if (execExistente) {
+        const { error } = await supabaseClient
+          .from('execucoes')
+          .update({ observacao: observacaoFinal })
+          .eq('id', execExistente.id);
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      } else {
+        if (observacaoFinal === null) return;
+
+        const { error } = await supabaseClient
+          .from('execucoes')
+          .insert({
+            item_id: null,
+            lider_id: liderAtual.id,
+            data: focoAtual.data,
+            observacao: observacaoFinal,
+            contexto: 'obs_geral_foco'
+          });
+
+        if (error) {
+          alert('Erro ao salvar: ' + error.message);
+          return;
+        }
+      }
+
       carregarFoco();
     }
 
